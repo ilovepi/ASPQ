@@ -51,7 +51,7 @@ Packet* StreamManager::pull(int port)
  */
 Packet* StreamManager::handle_packet(int port, Packet* p)
 {
-    if(!p)
+    if (!p)
         return p;
 
     switch (port)
@@ -106,22 +106,25 @@ Packet* StreamManager::add_stream(Packet* p)
     // int datalen = p->length() - header_len;
 
     // extract flow id
-    //IPFlowID id(iph->ip_src.s_addr, tcph->th_sport, iph->ip_dst.s_addr, tcph->th_dport);
+    // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport, iph->ip_dst.s_addr,
+    // tcph->th_dport);
 
-	IPFlowID id(p,false);
+    IPFlowID id(p, false);
 
-	stream_data::cb_data cb;
-	cb.ptr =NULL;
-	cb.el = this;
+    stream_data::cb_data cb;
+    cb.ptr = NULL;
+    cb.el = this;
     // assign the stream to the hashtable
-    //hash[id] = 
-    //stream_data(p, tcph->th_seq, tcph->th_ack, &cb);
+    // hash[id] =
+    // stream_data(p, tcph->th_seq, tcph->th_ack, &cb);
 
-    //unsigned int x = sizeof(sd);
-    //cb.ptr = (stream_data*)x;
+    // unsigned int x = sizeof(sd);
+    // cb.ptr = (stream_data*)x;
+
+    tbl_lock.acquire();
     hash.set(id, stream_data(p, tcph->th_seq, tcph->th_ack, &cb));
-
-    //hash[id].zero_wnd.initialize(this);
+    tbl_lock.release();
+    // hash[id].zero_wnd.initialize(this);
 
     return p;
 }
@@ -142,10 +145,11 @@ Packet* StreamManager::remove_stream(Packet* p)
     IPFlowID id(iph->ip_src.s_addr, tcph->th_sport, iph->ip_dst.s_addr,
                 tcph->th_dport);
 
+    tbl_lock.acquire();
+    if (hash.erase(id) == 0)
+        hash.erase(id.reverse());
 
-    if(hash.erase(id) ==0)
-    	hash.erase(id.reverse());
-
+    tbl_lock.release();
     return p;
 }
 
@@ -162,12 +166,15 @@ Packet* StreamManager::update_stream(Packet* p)
     const click_tcp* tcph = p->tcp_header();
 
     // extract flow id
-    //IPFlowID id(iph->ip_src.s_addr, tcph->th_sport, iph->ip_dst.s_addr,tcph->th_dport);
+    // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport,
+    // iph->ip_dst.s_addr,tcph->th_dport);
 
-    IPFlowID id(p,false);
+    IPFlowID id(p, false);
 
     // lock the hash??
-    HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.find(id);
+    tbl_lock.acquire();
+
+    HashTable_iterator<Pair<const IPFlowID, stream_data>> it = hash.find(id);
     if (it != hash.end())
     {
         it->second.reset_timers();
@@ -182,9 +189,10 @@ Packet* StreamManager::update_stream(Packet* p)
             if (it->second.ack > tcph->th_ack)
                 it->second.ack = tcph->th_ack;
 
-            //if the persist timer has expired, we've already sent
-            //0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2 here?)
-            if(it->second.frozen)
+            // if the persist timer has expired, we've already sent
+            // 0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2
+            // here?)
+            if (it->second.frozen)
             {
                 output(0).push(p->clone());
                 output(0).push(p->clone());
@@ -194,8 +202,9 @@ Packet* StreamManager::update_stream(Packet* p)
         }
     }
     // unlock the hash??
+    tbl_lock.release()
 
-    return p;
+        return p;
 }
 
 // Packet* StreamManager::check_ACK(Packet* p) {}
