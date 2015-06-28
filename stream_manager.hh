@@ -1,4 +1,3 @@
-
 #ifndef CLICK_STREAM_MANAGER_HH
 #define CLICK_STREAM_MANAGER_HH
 
@@ -63,6 +62,7 @@ class StreamManager : public Element
     // static const KEEP_ALIVE_TIMEOUT = 20;
     ErrorHandler* _errh;
     HashTable<IPFlowID, stream_data> hash;
+    SimpleSpinlock tbl_lock;
 // Task update;
 
 #if 0

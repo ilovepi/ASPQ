@@ -28,22 +28,27 @@ class stream_data
         }
     };
 
+    // default constructor
     stream_data()
         : p(0), seq(0), ack(0), persist_timer(5), val(1.5), frozen(false)
     {
         // zero_wnd.assign(send_zero_wnd, this);
     }
 
+    // regular constructor
     stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in,
                 void* data)
         : cb_ptrs(data), p(0), seq(seq_in), ack(ack_in), persist_timer(5),
           val(1.5), zero_wnd(callback, &cb_ptrs), frozen(false)
     {
         create_zero_wnd(p_in);
+        //assert(p!=NULL);
         zero_wnd.initialize(cb_ptrs.el->router());
         zero_wnd.schedule_after_sec(persist_timer);
     }
 
+    // copy constructor
+    
     stream_data(const stream_data& other)
         : cb_ptrs(other.cb_ptrs), seq(other.seq), ack(other.ack),
           persist_timer(other.persist_timer), val(other.val),
@@ -51,17 +56,35 @@ class stream_data
     {
 
         p = other.p->uniqueify();
-
         zero_wnd.initialize(other.zero_wnd.element());
         zero_wnd.schedule_at(other.zero_wnd.expiry());
     }
+
+    //stream_data(const stream_data& other) { *this = other; }
 
     stream_data& operator=(const stream_data& other)
     {
         if (this != &other)
         {
-            cb_ptrs = other.cb_ptrs;
-            p = other.p->uniqueify();
+            Packet* clone = NULL;
+            
+            assert(other.p != NULL);
+            cb_ptrs.ptr = other.cb_ptrs.ptr;
+            cb_ptrs.el = other.cb_ptrs.el;
+            if (other.p)
+            {
+                clone = other.p->clone();
+
+                if (!clone)
+                    p = NULL;
+                else
+                {
+                    p = clone->uniqueify();
+                    if (clone != p)
+                        clone->kill();
+                }
+            }
+            assert(p != NULL);
             seq = other.seq;
             ack = other.ack;
             persist_timer = other.persist_timer;
@@ -112,10 +135,16 @@ class stream_data
      */
     Packet* create_zero_wnd(const Packet* p_in)
     {
-        char data[128] = {0};
-
-        p = Packet::make(data, sizeof(data));
+        assert(p==NULL);
+        if (p == NULL)
+        {
+            char data[128] = {0};
+            //assert(sizeof(data) == 128);
+            p = Packet::make(0,data, sizeof(data),0);
+        }
+        assert(p != NULL);
         assert(sizeof(*p) >= 128);
+
         if (p)
         {
             p->set_network_header(p->data(), 20);
@@ -206,27 +235,5 @@ class stream_data
     bool frozen;
 
 }; // end class stream
-
-#if 0
-typedef std::shared_ptr<HashTable<stream_id, stream_data>> hash_ptr;
-hash_ptr tbl_ptr;
-SimpleSpinlock tbl_lock;
-
-hash_ptr make_stream_table()
-{
-	std::lock_guard<SimpleSpinlock> lock(tbl_lock);
-	if (!tbl_ptr)
-		tbl_ptr = std::make_shared<hash_ptr>();
-	return tbl_ptr;
-}
-
-void release_global_hash()
-{
-	std::lock_guard<SimpleSpinlock> lock(tbl_lock);
-	if(tbl_ptr)
-		tbl_ptr.reset();
-}
-
-#endif
 
 #endif

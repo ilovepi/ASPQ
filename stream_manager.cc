@@ -51,6 +51,9 @@ Packet* StreamManager::pull(int port)
  */
 Packet* StreamManager::handle_packet(int port, Packet* p)
 {
+    if(!p)
+        return p;
+
     switch (port)
     {
     // add stream
@@ -91,7 +94,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
 Packet* StreamManager::add_stream(Packet* p)
 {
     const click_ip* iph = p->ip_header();
-    if (p->length() < 40 || iph->ip_p != IPPROTO_TCP)
+    if (iph->ip_len < 40 || iph->ip_p != IPPROTO_TCP)
     {
         //   DEBUG_CHATTER("Non TCP");
         // ignore non-TCP traffic
@@ -111,7 +114,12 @@ Packet* StreamManager::add_stream(Packet* p)
 	cb.ptr =NULL;
 	cb.el = this;
     // assign the stream to the hashtable
-    hash[id] = stream_data(p, tcph->th_seq, tcph->th_ack, &cb);
+    //hash[id] = 
+    //stream_data(p, tcph->th_seq, tcph->th_ack, &cb);
+
+    //unsigned int x = sizeof(sd);
+    //cb.ptr = (stream_data*)x;
+    hash.set(id, stream_data(p, tcph->th_seq, tcph->th_ack, &cb));
 
     //hash[id].zero_wnd.initialize(this);
 

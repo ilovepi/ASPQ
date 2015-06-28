@@ -1,7 +1,7 @@
 require(package "stream_manager")
 
-end :: Queue(500)-> IPPrint(TIMESTAMP false, TOS true, CONTENTS NONE)-> ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
-
+//end :: Queue(500)-> IPPrint(TIMESTAMP false, TOS true, CONTENTS NONE)-> ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
+end :: Queue(500)-> ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
 //end :: ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
 
 stream :: StreamManager
@@ -11,10 +11,10 @@ stream[1]->SetTCPChecksum->SetIPChecksum->end;
 
 cl :: IPClassifier(src host 2.0.0.1, tcp and syn and not ack, tcp and (fin or rst), tcp and ack, -);
 cl[0]->[0]end;
-cl[1]->[0]stream;
-cl[2]->[2]stream;
-cl[3]->[1]stream;
-cl[4]->[3]stream;
+cl[1]->[0]stream;// add stream
+cl[2]->[2]stream;// remove stream
+cl[3]->[1]stream;// update stream
+cl[4]->[3]stream;// do nothing, pass packets along
 
 source :: FastTCPFlows(100000, 5000, 60, 0:0:0:0:0:0, 1.0.0.1, 1:1:1:1:1:1, 2.0.0.2, 10, 10);
  
