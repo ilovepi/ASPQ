@@ -16,7 +16,7 @@ cl[2]->[2]stream;// remove stream
 cl[3]->[1]stream;// update stream
 cl[4]->[3]stream;// do nothing, pass packets along
 
-source :: FastTCPFlows(100000, 5000, 60, 0:0:0:0:0:0, 1.0.0.1, 1:1:1:1:1:1, 2.0.0.2, 10, 10);
+source :: FastTCPFlows(100000, 5000, 60, 0:0:0:0:0:0, 2.0.0.1, 1:1:1:1:1:1, 2.0.0.2, 10, 10);
  
 
 p:: PullTee(2);
