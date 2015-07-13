@@ -19,8 +19,6 @@ CLICKPACKAGENAME=stream_manager
 AC_SUBST(CLICKPACKAGENAME)
 
 
-dnl AC_PROG_CXX([clang++])
-
 dnl
 dnl locate Click install directory
 dnl

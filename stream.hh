@@ -42,13 +42,13 @@ class stream_data
           val(1.5), zero_wnd(callback, &cb_ptrs), frozen(false)
     {
         create_zero_wnd(p_in);
-        //assert(p!=NULL);
+        // assert(p!=NULL);
         zero_wnd.initialize(cb_ptrs.el->router());
         zero_wnd.schedule_after_sec(persist_timer);
     }
 
     // copy constructor
-    
+
     stream_data(const stream_data& other)
         : cb_ptrs(other.cb_ptrs), seq(other.seq), ack(other.ack),
           persist_timer(other.persist_timer), val(other.val),
@@ -60,14 +60,14 @@ class stream_data
         zero_wnd.schedule_at(other.zero_wnd.expiry());
     }
 
-    //stream_data(const stream_data& other) { *this = other; }
+    // stream_data(const stream_data& other) { *this = other; }
 
     stream_data& operator=(const stream_data& other)
     {
         if (this != &other)
         {
             Packet* clone = NULL;
-            
+
             assert(other.p != NULL);
             cb_ptrs.ptr = other.cb_ptrs.ptr;
             cb_ptrs.el = other.cb_ptrs.el;
@@ -135,12 +135,12 @@ class stream_data
      */
     Packet* create_zero_wnd(const Packet* p_in)
     {
-        assert(p==NULL);
+        assert(p == NULL);
         if (p == NULL)
         {
             char data[128] = {0};
-            //assert(sizeof(data) == 128);
-            p = Packet::make(0,data, sizeof(data),0);
+            // assert(sizeof(data) == 128);
+            p = Packet::make(0, data, sizeof(data), 0);
         }
         assert(p != NULL);
         assert(sizeof(*p) >= 128);

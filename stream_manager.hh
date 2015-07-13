@@ -41,7 +41,7 @@ class StreamManager : public Element
     const char* class_name() const { return "StreamManager"; }
     const char* port_count() const { return "4/2"; }
     const char* processing() const { return "a/ah"; }
-    //const char* flow_code() const { return ; }
+    // const char* flow_code() const { return ; }
     int initialize(ErrorHandler* errh);
     int configure(Vector<String>& conf, ErrorHandler* errh);
     // Packet* simple_action(Packet* p);
