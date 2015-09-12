@@ -16,14 +16,11 @@ cl[2]->[2]stream;// remove stream
 cl[3]->[1]stream;// update stream
 cl[4]->[3]stream;// do nothing, pass packets along
 
-source :: FastTCPFlows(100000, 5000, 60, 0:0:0:0:0:0, 2.0.0.1, 1:1:1:1:1:1, 2.0.0.2, 10, 10);
- 
+source :: FastTCPFlows(100000, 50000, 128, 0:0:0:0:0:0, 2.0.0.1, 1:1:1:1:1:1, 2.0.0.2, 100, 10000);
 
 p:: PullTee(2);
 p[0]->Discard;
 p[1]->cl;
-
-
 
 /*InfiniteSource(DATA \<
   // Ethernet header
@@ -38,8 +35,6 @@ p[1]->cl;
   53 53 00 00  05 00 00 00  00 10 00 00  01 00 00 00  54 53 00 00
   54 e3 04 08  54 e3 04 08  d8 01 00 00
 >, LIMIT 25, STOP true)*/
-
-
 
 source
 	-> Strip(14)

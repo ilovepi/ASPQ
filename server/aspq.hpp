@@ -1,8 +1,8 @@
 #ifndef ASPQ_HPP_
 #define ASPQ_HPP_
 
-#include <boost/asio.hpp>
-#include <boost/lockfree/queue.hpp>
+#include <../boost/asio.hpp>
+#include <../boost/lockfree/queue.hpp>
 #include <atomic>
 
 class spq {
@@ -14,9 +14,9 @@ public:
   void reomve();
 
 private:
-  queue _high;
+  boost::lockfree::queue _high;
 
-  queue _low;
+  boost::lockfree::queue _low;
 
   int high_capacity;
   int low_capacity;
