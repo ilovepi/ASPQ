@@ -12,8 +12,7 @@ int StreamManager::configure(Vector<String>& conf, ErrorHandler* errh)
 {
     String channel;
     // errh->message("My int = %u", 22);
-    if (Args(conf, this, errh).read("CHANNEL", WordArg(), channel).complete() <
-        0)
+    if (Args(conf, this, errh).read("CHANNEL", WordArg(), channel).complete() < 0)
     {
         return -1;
     }
@@ -181,7 +180,8 @@ Packet* StreamManager::update_stream(Packet* p)
     }
     else
     {
-        if ((it = hash.find(id.reverse())) != hash.end())
+        it = hash.find(id.reverse());
+        if (it != hash.end())
         {
             if (it->second.seq > tcph->th_seq)
                 it->second.seq = tcph->th_seq;
@@ -201,7 +201,7 @@ Packet* StreamManager::update_stream(Packet* p)
             }
         }
     }
-    // unlock the hash??
+    // unlock the hash
     tbl_lock.release();
 
     return p;
