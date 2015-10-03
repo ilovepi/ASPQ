@@ -37,25 +37,23 @@ c0[0] -> ar1 -> out0;
 c0[1] ->[1]arpq0 ;
 c1[1] ->[1]arpq1 ;
 
-
-
 stream :: StreamManager;
-stream[0] -> arpq0 ;
-stream[1] -> SetTCPChecksum -> SetIPChecksum-> arpq0 ;
+stream[0] -> arpq1 ;
+stream[1] -> SetTCPChecksum -> SetIPChecksum-> arpq1 ;
 
 
 cl :: IPClassifier(dst tcp port 9876, tcp and syn and not ack, tcp and (fin or rst), tcp and ack, -);
 //cl :: IPClassifier(src host 10.42.0.0/24, tcp and syn and not ack, tcp and (fin or rst), tcp and ack, -);
-cl[0]->[0]arpq0 ;
+cl[0]->[0]arpq1 ;
 cl[1]->[0]stream;// add stream
 cl[2]->[2]stream;// remove stream
 cl[3]->[1]stream;// update stream
 cl[4]->[3]stream;// do nothing, pass packets along
 
 
-p:: PullTee(2);
-p[0]->Discard;
-p[1]->cl;
+//p:: PullTee(2);
+//p[0]->Discard;
+//p[1]->cl;
 
 
 ip0 :: Strip(14)
