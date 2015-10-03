@@ -1,43 +1,76 @@
 require(package "stream_manager")
 
-//end :: Queue(500)-> IPPrint(TIMESTAMP false, TOS true, CONTENTS NONE)-> ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
-end :: Queue(500)-> ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
-//end :: ToDump(FILENAME "MyDump.pcap", ENCAP IP)->Discard;
+c0 :: Classifier(12/0806 20/0001,
+                  12/0806 20/0002,
+                  12/0800,
+                  -);
 
-stream :: StreamManager
-stream[0]->end;
-stream[1]->SetTCPChecksum->SetIPChecksum->end;
+c1 :: Classifier(12/0806 20/0001,
+                  12/0806 20/0002,
+                  12/0800,
+                  -);
+
+FromDevice(eth0, PROMISC true) -> c0 ;
+
+FromDevice(eth1, PROMISC true) -> c1 ;
+
+out0 :: Queue(5000)
+//    -> ARPPrint(TIMESTAMP false, ETHER true)
+    -> ToDevice(eth0)
+    -> Discard ;
+out1 :: Queue(5000)
+//    -> ARPPrint(TIMESTAMP false, ETHER true)
+    -> ToDevice(eth1)
+    -> Discard ;
+
+arpq0 :: ARPQuerier(169.254.9.88, 94:57:A5:8E:12:F4) -> out0 ;
+arpq1 :: ARPQuerier(169.254.9.93, 94:57:A5:8E:12:F5) -> out1 ;
+
+ar0 :: ARPResponder(169.254.9.88/16 94:57:A5:8E:12:F4) ;
+
+ar1 :: ARPResponder(169.254.9.93/16 94:57:A5:8E:12:F5) ;
+c1[0] -> ar0 -> out1;
+c0[0] -> ar1 -> out0;
 
 
-cl :: IPClassifier(src host 2.0.0.1, tcp and syn and not ack, tcp and (fin or rst), tcp and ack, -);
-cl[0]->[0]end;
+
+c0[1] ->[1]arpq0 ;
+c1[1] ->[1]arpq1 ;
+
+
+
+stream :: StreamManager;
+stream[0] -> arpq0 ;
+stream[1] -> SetTCPChecksum -> SetIPChecksum-> arpq0 ;
+
+
+cl :: IPClassifier(dst tcp port 9876, tcp and syn and not ack, tcp and (fin or rst), tcp and ack, -);
+//cl :: IPClassifier(src host 10.42.0.0/24, tcp and syn and not ack, tcp and (fin or rst), tcp and ack, -);
+cl[0]->[0]arpq0 ;
 cl[1]->[0]stream;// add stream
 cl[2]->[2]stream;// remove stream
 cl[3]->[1]stream;// update stream
 cl[4]->[3]stream;// do nothing, pass packets along
 
-source :: FastTCPFlows(100000, 50000, 128, 0:0:0:0:0:0, 2.0.0.1, 1:1:1:1:1:1, 2.0.0.2, 100, 10000);
 
 p:: PullTee(2);
 p[0]->Discard;
 p[1]->cl;
 
-/*InfiniteSource(DATA \<
-  // Ethernet header
-  00 00 c0 ae 67 ef  00 00 00 00 00 00  08 00
-  // IP header
-  45 11 00 28  00 00 00 00  40 11 77 c3  02 00 00 01  02 00 00 02
-  // UDP header
-  13 69 13 69  00 14 d6 41
-  // UDP payload
-  55 44 50 20  70 61 63 6b  65 74 21 0a  04 00 00 00  01 00 00 00  
-  01 00 00 00  00 00 00 00  00 80 04 08  00 80 04 08  53 53 00 00
-  53 53 00 00  05 00 00 00  00 10 00 00  01 00 00 00  54 53 00 00
-  54 e3 04 08  54 e3 04 08  d8 01 00 00
->, LIMIT 25, STOP true)*/
 
-source
-	-> Strip(14)
-	-> Align(4, 0)    // in case we're not on x86
-	-> CheckIPHeader(VERBOSE true)	
-	-> p;
+ip0 :: Strip(14)
+    -> CheckIPHeader(VERBOSE true)
+//    -> IPPrint(TIMESTAMP false,  CONTENTS NONE)
+    ->  cl ;
+
+c0[2]-> ip0;
+
+ip1 :: Strip(14)
+    -> CheckIPHeader(VERBOSE true)
+//    -> IPPrint(TIMESTAMP false, TOS true, CONTENTS NONE)
+    -> arpq0 ;
+
+c1[2]-> ip1;
+c0[3] -> Discard;
+c1[3] -> Discard;
+
