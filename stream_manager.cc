@@ -12,8 +12,7 @@ int StreamManager::configure(Vector<String>& conf, ErrorHandler* errh)
 {
     String channel;
     // errh->message("My int = %u", 22);
-    if (Args(conf, this, errh).read("CHANNEL", WordArg(), channel).complete() <
-        0)
+    if (Args(conf, this, errh).read("CHANNEL", WordArg(), channel).complete() < 0)
     {
         return -1;
     }
