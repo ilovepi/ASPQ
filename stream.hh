@@ -29,7 +29,8 @@ class stream_data
     stream_data()
         : p(0), seq(0), ack(0), persist_timer(5), val(1.5), frozen(false)
     {
-        // zero_wnd.assign(send_zero_wnd, this);
+        cb_ptrs.ptr=this;
+        //zero_wnd.assign(send_zero_wnd, this);
     }
 
     // regular constructor
@@ -38,6 +39,19 @@ class stream_data
         : cb_ptrs(data), p(0), seq(seq_in), ack(ack_in), persist_timer(5),
           val(1.5), zero_wnd(callback, &cb_ptrs), frozen(false)
     {
+        cb_ptrs.ptr = this;
+        create_zero_wnd(p_in);
+        // assert(p!=NULL);
+        zero_wnd.initialize(cb_ptrs.el->router());
+        zero_wnd.schedule_after_sec(persist_timer);
+    }
+
+    stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in, Element* el)
+        : p(0), seq(seq_in), ack(ack_in), persist_timer(5),
+          val(1.5), zero_wnd(callback, &cb_ptrs), frozen(false)
+    {
+        cb_ptrs.el = el;
+        cb_ptrs.ptr = this;
         create_zero_wnd(p_in);
         // assert(p!=NULL);
         zero_wnd.initialize(cb_ptrs.el->router());
@@ -51,8 +65,8 @@ class stream_data
           persist_timer(other.persist_timer), val(other.val),
           zero_wnd(callback, &cb_ptrs), frozen(false)
     {
-
-        p = other.p->uniqueify();
+        cb_ptrs.ptr=this;
+        p = other.p->clone()->uniqueify();
         zero_wnd.initialize(other.zero_wnd.element());
         zero_wnd.schedule_at(other.zero_wnd.expiry());
     }
@@ -63,23 +77,12 @@ class stream_data
     {
         if (this != &other)
         {
-            Packet* clone = NULL;
-
             assert(other.p != NULL);
-            cb_ptrs.ptr = other.cb_ptrs.ptr;
+            cb_ptrs.ptr = this;
             cb_ptrs.el = other.cb_ptrs.el;
             if (other.p)
             {
-                clone = other.p->clone();
-
-                if (!clone)
-                    p = NULL;
-                else
-                {
-                    p = clone->uniqueify();
-                    if (clone != p)
-                        clone->kill();
-                }
+                p = other.p->clone()->uniqueify();
             }
             assert(p != NULL);
             seq = other.seq;
@@ -99,25 +102,31 @@ class stream_data
     {
         if (p)
             p->kill();
+        zero_wnd.unschedule();
     }
 
     static void callback(Timer* timer, void* data)
     {
         cb_data* cb = (cb_data*)data;
+        assert(data != NULL);
+        assert(timer != NULL);
+        assert(cb != NULL);
+        assert(cb->ptr != NULL);
+        assert(cb->el != NULL);
         cb->ptr->send_zero_wnd(timer, cb->el);
     }
 
     void send_zero_wnd(Timer* timer, void* data)
     {
         Element* el = (Element*)data;
-        click_tcp* tcp = p->uniqueify()->tcp_header();
+        click_tcp* tcp = p->tcp_header();
         tcp->th_ack = ack;
         tcp->th_seq = seq;
         // click_update_in_cksum
 
         // output 1 goes to a tcp checksum element followed by ipcsum
         // element before normal routing
-//        el->output(1).push(p->clone()); // maybe wrong!!!!!!!!
+        el->output(1).push(p->clone()); // maybe wrong!!!!!!!!
 
         timer->reschedule_after_sec(update_persist_timer());
     }
@@ -135,40 +144,38 @@ class stream_data
   //      assert(p == NULL);
         if (p == NULL)
         {
-            char data[64] = {0};
+            char data[40] = {0};
             // assert(sizeof(data) == 128);
             p = Packet::make(14, data, sizeof(data), 0);
         }
-//        assert(p != NULL);
-        //assert(sizeof(*p) >= 128);
+        assert(p != NULL);
+        assert(sizeof(*p) >= 40);
 
-        if (p)
-        {
-            p->set_network_header(p->data(), 20);
-            const click_ip* ip_in = p_in->ip_header();
-            click_ip* ip_out = p->ip_header();
-            const click_tcp* tcp_in = p_in->tcp_header();
-            click_tcp* tcp_out = p->tcp_header();
+        p->set_network_header(p->data(), 20);
+        const click_ip* ip_in = p_in->ip_header();
+        click_ip* ip_out = p->ip_header();
+        const click_tcp* tcp_in = p_in->tcp_header();
+        click_tcp* tcp_out = p->tcp_header();
 
-            ip_out->ip_src = ip_in->ip_dst;
-            ip_out->ip_dst = ip_in->ip_src;
-            // ip_out->ip_tos = 0;
-            ip_out->ip_len = htons(60);
-            ip_out->ip_id = ip_in->ip_id;
-            // ip_out->ip_csum = 0;
-            ip_out->ip_ttl = 255;
-            ip_out->ip_p = ip_in->ip_p;
+        ip_out->ip_src = ip_in->ip_dst;
+        ip_out->ip_dst = ip_in->ip_src;
+        // ip_out->ip_tos = 0;
+        ip_out->ip_len = htons(40);
+        ip_out->ip_id = ip_in->ip_id;
+        // ip_out->ip_csum = 0;
+        ip_out->ip_ttl = 255;
+        ip_out->ip_p = ip_in->ip_p;
 
-            tcp_out->th_dport = tcp_in->th_sport;
-            tcp_out->th_sport = tcp_in->th_dport;
-            // tcp_out->th_seq = 0;
-            // tcp_out->th_ack = 0;
-            tcp_out->th_off = 5;
-            // tcp_out->th_flags = 0;
-            tcp_out->th_flags |= TH_ACK;
-            // tcp_out->tcp_win = 0;
-            // tcp_out->th_sum = 0;
-        }
+        tcp_out->th_dport = tcp_in->th_sport;
+        tcp_out->th_sport = tcp_in->th_dport;
+        // tcp_out->th_seq = 0;
+        // tcp_out->th_ack = 0;
+        tcp_out->th_off = 5;
+        // tcp_out->th_flags = 0;
+        tcp_out->th_flags |= TH_ACK;
+        // tcp_out->tcp_win = 0;
+        // tcp_out->th_sum = 0;
+
         return p;
     }
 

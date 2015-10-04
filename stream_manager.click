@@ -14,11 +14,11 @@ FromDevice(eth0, PROMISC true) -> c0 ;
 
 FromDevice(eth1, PROMISC true) -> c1 ;
 
-out0 :: Queue(500)
+out0 :: Queue(10000)
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
     -> ToDevice(eth0)
     -> Discard ;
-out1 :: Queue(500)
+out1 :: Queue(10000)
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
     -> ToDevice(eth1)
     -> Discard ;
@@ -39,7 +39,7 @@ c1[1] ->[1]arpq1 ;
 
 stream :: StreamManager;
 stream[0] -> arpq1 ;
-stream[1] -> SetTCPChecksum -> SetIPChecksum-> arpq0 ;
+stream[1] -> SetTCPChecksum -> SetIPChecksum -> arpq0 ;
 stream[2] -> arpq0 ;
 
 

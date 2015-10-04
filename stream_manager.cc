@@ -66,7 +66,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
 
     // update timers
     case 1:
-        //p = update_stream(p);
+        p = update_stream(p);
         output(0).push(p);
         break;
 
