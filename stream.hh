@@ -9,9 +9,6 @@
 #include <click/hashtable.hh>
 #include <click/sync.hh>
 #include <click/timer.hh>
-//#include <cmath>
-//#include <memory>
-//#include <mutex>
 
 class stream_data
 {
@@ -120,7 +117,7 @@ class stream_data
 
         // output 1 goes to a tcp checksum element followed by ipcsum
         // element before normal routing
-        el->output(1).push(p->clone()); // maybe wrong!!!!!!!!
+//        el->output(1).push(p->clone()); // maybe wrong!!!!!!!!
 
         timer->reschedule_after_sec(update_persist_timer());
     }
@@ -135,15 +132,15 @@ class stream_data
      */
     Packet* create_zero_wnd(const Packet* p_in)
     {
-        assert(p == NULL);
+  //      assert(p == NULL);
         if (p == NULL)
         {
-            char data[128] = {0};
+            char data[64] = {0};
             // assert(sizeof(data) == 128);
-            p = Packet::make(0, data, sizeof(data), 0);
+            p = Packet::make(14, data, sizeof(data), 0);
         }
-        assert(p != NULL);
-        assert(sizeof(*p) >= 128);
+//        assert(p != NULL);
+        //assert(sizeof(*p) >= 128);
 
         if (p)
         {
@@ -236,4 +233,4 @@ class stream_data
 
 }; // end class stream
 
-#endif
+#endif // end of @file stream.hh

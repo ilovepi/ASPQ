@@ -23,25 +23,26 @@ int StreamManager::configure(Vector<String>& conf, ErrorHandler* errh)
     return 0;
 }
 
-// Packet* StreamManager::simple_action(Packet* p) {}
 
 void StreamManager::push(int port, Packet* p)
 {
-    p = handle_packet(port, p);
-    if (p)
+     handle_packet(port, p);
+    /*if (p)
         output(0).push(p);
+    */
 }
 
-Packet* StreamManager::pull(int port)
+/*Packet* StreamManager::pull(int port)
 {
     Packet* p = input(port).pull();
     if (p)
-        p = handle_packet(0, p);
+        p = handle_packet(port, p);
     return p;
 }
+*/
 
 /**
- * @brief Handles packets comming in on each port
+ * @brief Handles packets coming in on each port
  * @details [long description]
  *
  * @param port click port number
@@ -51,6 +52,7 @@ Packet* StreamManager::pull(int port)
  */
 Packet* StreamManager::handle_packet(int port, Packet* p)
 {
+    // we don't support null packets, so return early...
     if (!p)
         return p;
 
@@ -59,21 +61,27 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
     // add stream
     case 0:
         p = add_stream(p);
+        output(0).push(p);
         break;
 
     // update timers
     case 1:
-        p = update_stream(p);
+        //p = update_stream(p);
+        output(0).push(p);
         break;
 
     case 2:
-        p = remove_stream(p);
+        //p = remove_stream(p);
+        output(0).push(p);
         break;
-
+    case 3:
+        output(0).push(p);
+        break;
     // remove stream
-    // case 3:
-    // p = update_ack();
-    //  break;
+     case 4:
+        //p = update_ack(p);
+        output(2).push(p);
+        break;
 
     // not one of our ports, so do nothing, and pass the packet on.
     default:
@@ -93,14 +101,14 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
  */
 Packet* StreamManager::add_stream(Packet* p)
 {
-    const click_ip* iph = p->ip_header();
+/*  const click_ip* iph = p->ip_header();
     if (iph->ip_len < 40 || iph->ip_p != IPPROTO_TCP)
     {
         //   DEBUG_CHATTER("Non TCP");
         // ignore non-TCP traffic
         return p;
     }
-
+*/
     const click_tcp* tcph = p->tcp_header();
     // int header_len = (iph->ip_hl << 2) + (tcph->th_off << 2);
     // int datalen = p->length() - header_len;
@@ -114,17 +122,11 @@ Packet* StreamManager::add_stream(Packet* p)
     stream_data::cb_data cb;
     cb.ptr = NULL;
     cb.el = this;
+
     // assign the stream to the hashtable
-    // hash[id] =
-    // stream_data(p, tcph->th_seq, tcph->th_ack, &cb);
-
-    // unsigned int x = sizeof(sd);
-    // cb.ptr = (stream_data*)x;
-
     tbl_lock.acquire();
     hash.set(id, stream_data(p, tcph->th_seq, tcph->th_ack, &cb));
     tbl_lock.release();
-    // hash[id].zero_wnd.initialize(this);
 
     return p;
 }
@@ -132,13 +134,13 @@ Packet* StreamManager::add_stream(Packet* p)
 Packet* StreamManager::remove_stream(Packet* p)
 {
     const click_ip* iph = p->ip_header();
-    if (p->length() < 40 || iph->ip_p != IPPROTO_TCP)
+/*    if (p->length() < 40 || iph->ip_p != IPPROTO_TCP)
     {
         // DEBUG_CHATTER("Non TCP");
         // ignore non-TCP traffic
         return p;
     }
-
+*/
     const click_tcp* tcph = p->tcp_header();
 
     // extract flow id
@@ -155,7 +157,7 @@ Packet* StreamManager::remove_stream(Packet* p)
 
 Packet* StreamManager::update_stream(Packet* p)
 {
-    const click_ip* iph = p->ip_header();
+/*    const click_ip* iph = p->ip_header();
     if (p->length() < 40 || iph->ip_p != IPPROTO_TCP)
     {
         // DEBUG_CHATTER("Non TCP");
@@ -164,7 +166,7 @@ Packet* StreamManager::update_stream(Packet* p)
     }
 
     const click_tcp* tcph = p->tcp_header();
-
+*/
     // extract flow id
     // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport,
     // iph->ip_dst.s_addr,tcph->th_dport);
@@ -179,34 +181,52 @@ Packet* StreamManager::update_stream(Packet* p)
     {
         it->second.reset_timers();
     }
-    else
-    {
-        if ((it = hash.find(id.reverse())) != hash.end())
-        {
-            if (it->second.seq > tcph->th_seq)
-                it->second.seq = tcph->th_seq;
-
-            if (it->second.ack > tcph->th_ack)
-                it->second.ack = tcph->th_ack;
-
-            // if the persist timer has expired, we've already sent
-            // 0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2
-            // here?)
-            if (it->second.frozen)
-            {
-                output(0).push(p->clone());
-                output(0).push(p->clone());
-                output(0).push(p->clone());
-                it->second.frozen = false;
-            }
-        }
-    }
-    // unlock the hash??
     tbl_lock.release();
 
     return p;
 }
 
-// Packet* StreamManager::check_ACK(Packet* p) {}
+Packet* StreamManager::update_ack(Packet* p)
+{
+    const click_tcp* tcph = p->tcp_header();
+
+    // extract flow id
+    // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport,
+    // iph->ip_dst.s_addr,tcph->th_dport);
+
+    IPFlowID id(p, false);
+
+    // lock the hash??
+    tbl_lock.acquire();
+
+    HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.find(id.reverse());
+    if(it != hash.end())
+    {
+       //update the sequence number
+        if (it->second.seq > tcph->th_seq)
+            it->second.seq = tcph->th_seq;
+
+        // update the ack number
+        if (it->second.ack > tcph->th_ack)
+            it->second.ack = tcph->th_ack;
+
+        // if the persist timer has expired, we've already sent
+        // 0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2
+        // here?)
+        if (it->second.frozen)
+        {
+            output(2).push(p->clone());
+            output(2).push(p->clone());
+           // output(2).push(p->clone());
+            it->second.frozen = false;
+        }
+    }
+    // unlock the hash??
+    tbl_lock.release();
+    return p;
+}
+
+
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StreamManager)

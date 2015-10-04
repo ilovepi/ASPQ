@@ -23,13 +23,13 @@ CLICK_DECLS
  * Port 0: Adds new streams
  * Port 1: updates existing streams
  * Port 2: removes streams
- * Port 4: currently unused, may remove
+ * Port 3: do nothing, pass packet out
  *
  * Outputs:
  * Port 0: goes to normal routing, incoming packets exit here normally
  * Port 1: goes through TCP and IP checksum elements prior to normal routing
- * It is used primarily(exclusivly) for sending the generated Zero Window
- * notifications used to "freeze" the tcp connection.
+ * It is used primarily(exclusively) for sending the generated Zero Window
+ * notifications used to "freeze" the TCP connection.
  *
  */
 class StreamManager : public Element
@@ -39,39 +39,27 @@ class StreamManager : public Element
     ~StreamManager();
 
     const char* class_name() const { return "StreamManager"; }
-    const char* port_count() const { return "4/2"; }
-    const char* processing() const { return "a/ah"; }
-    // const char* flow_code() const { return ; }
+    const char* port_count() const { return "5/3"; }
+    const char* processing() const { return "h/h"; }
+
     int initialize(ErrorHandler* errh);
     int configure(Vector<String>& conf, ErrorHandler* errh);
-    // Packet* simple_action(Packet* p);
+
     void push(int port, Packet* p);
-    Packet* pull(int port);
+   // Packet* pull(int port);
+
     Packet* handle_packet(int port, Packet* p);
     Packet* add_stream(Packet* p);
     Packet* remove_stream(Packet* p);
     Packet* update_stream(Packet* p);
-    // Packet* check_ACK(Packet* p);
-    // Packet* send_zero_wnd();
-    // Packet* craft_zero_wnd();
-    // //send_keepalive();
-    // //craft_keepalive();
-    // void update_persist_timer(Timer* t);
+    Packet* update_ack(Packet* p);
 
   private:
-    // static const KEEP_ALIVE_TIMEOUT = 20;
     ErrorHandler* _errh;
     HashTable<IPFlowID, stream_data> hash;
     SimpleSpinlock tbl_lock;
-// Task update;
 
-#if 0
-#if CLICK_USERLEVEL
-    String _outfilename;
-    FILE* _outfile;
-#endif
-#endif
 };
 
 CLICK_ENDDECLS
-#endif // end of @file sream_manager.hh
+#endif // end of @file stream_manager.hh
