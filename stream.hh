@@ -160,6 +160,7 @@ class stream_data
         ip_out->ip_src = ip_in->ip_dst;
         ip_out->ip_dst = ip_in->ip_src;
         // ip_out->ip_tos = 0;
+        ip_out->ip_hl=5;
         ip_out->ip_len = htons(40);
         ip_out->ip_id = ip_in->ip_id;
         // ip_out->ip_csum = 0;

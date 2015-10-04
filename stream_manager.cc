@@ -65,7 +65,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
 
     // update timers
     case 1:
-        p = update_stream(p);
+        //p = update_stream(p);
         output(0).push(p);
         break;
 
@@ -201,7 +201,7 @@ Packet* StreamManager::update_ack(Packet* p)
     HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.find(id.reverse());
     if(it != hash.end())
     {
-       //update the sequence number
+        //update the sequence number
         if (it->second.seq > tcph->th_seq)
             it->second.seq = tcph->th_seq;
 
@@ -219,6 +219,9 @@ Packet* StreamManager::update_ack(Packet* p)
            // output(2).push(p->clone());
             it->second.frozen = false;
         }
+
+        it->second.reset_timers();
+
     }
     // unlock the hash??
     tbl_lock.release();
