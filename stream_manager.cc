@@ -59,7 +59,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
     {
     // add stream
     case 0:
-        p = add_stream(p);
+        //p = add_stream(p);
         output(0).push(p);
         break;
 
@@ -78,7 +78,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         break;
     // remove stream
      case 4:
-        //p = update_ack(p);
+       // p = update_ack(p);
         output(2).push(p);
         break;
 
