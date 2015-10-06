@@ -9,6 +9,7 @@
 #include <click/hashtable.hh>
 #include <click/sync.hh>
 #include <click/timer.hh>
+#include <cstdio>
 
 class stream_data
 {
@@ -34,7 +35,7 @@ class stream_data
     }
 
     // regular constructor
-    stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in,
+/*    stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in,
                 void* data)
         : cb_ptrs(data), p(0), seq(seq_in), ack(ack_in), persist_timer(5),
           val(1.5), zero_wnd(callback, &cb_ptrs), frozen(false)
@@ -45,7 +46,7 @@ class stream_data
         zero_wnd.initialize(cb_ptrs.el->router());
         zero_wnd.schedule_after_sec(persist_timer);
     }
-
+*/
     stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in, Element* el)
         : p(0), seq(seq_in), ack(ack_in), persist_timer(5),
           val(1.5), zero_wnd(callback, &cb_ptrs), frozen(false)
@@ -53,7 +54,7 @@ class stream_data
         cb_ptrs.el = el;
         cb_ptrs.ptr = this;
         create_zero_wnd(p_in);
-        // assert(p!=NULL);
+         assert(p!=NULL);
         zero_wnd.initialize(cb_ptrs.el->router());
         zero_wnd.schedule_after_sec(persist_timer);
     }
@@ -131,6 +132,20 @@ class stream_data
         timer->reschedule_after_sec(update_persist_timer());
     }
 
+    void send_zero_wnd()
+    {
+        //click_tcp* tcp = p->tcp_header();
+        //tcp->th_ack = ack;
+        //tcp->th_seq = seq;
+        // click_update_in_cksum
+//        printf("My ack: %ld\tMy seq: %ld\tACK: %ld\t SEQ: %ld\n",  ntohl(ack), ntohl(seq), ntohl(tcp->th_ack), ntohl(tcp->th_seq));
+        // output 1 goes to a tcp checksum element followed by ipcsum
+        // element before normal routing
+        cb_ptrs.el->output(1).push(p->clone()->uniqueify()); // maybe wrong!!!!!!!!
+
+        zero_wnd.reschedule_after_sec(update_persist_timer());
+    }
+
     /**
      * @brief create a zero window packet to be sent with the callback timer
      * @details create a zero window packet to be sent with the call back timer.
@@ -141,15 +156,16 @@ class stream_data
      */
     Packet* create_zero_wnd(const Packet* p_in)
     {
+        char data[66] = {0};
   //      assert(p == NULL);
         if (p == NULL)
         {
-            char data[40] = {0};
+
             // assert(sizeof(data) == 128);
             p = Packet::make(14, data, sizeof(data), 0);
         }
         assert(p != NULL);
-        assert(sizeof(*p) >= 40);
+        assert(sizeof(*p) >= sizeof(data));
 
         p->set_network_header(p->data(), 20);
         const click_ip* ip_in = p_in->ip_header();
@@ -161,7 +177,7 @@ class stream_data
         ip_out->ip_dst = ip_in->ip_src;
         // ip_out->ip_tos = 0;
         ip_out->ip_hl=5;
-        ip_out->ip_len = htons(40);
+        ip_out->ip_len = htons(sizeof(data));
         ip_out->ip_id = ip_in->ip_id;
         // ip_out->ip_csum = 0;
         ip_out->ip_ttl = 255;

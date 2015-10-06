@@ -59,7 +59,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
     {
     // add stream
     case 0:
-        //p = add_stream(p);
+        p = add_stream(p);
         output(0).push(p);
         break;
 
@@ -70,7 +70,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         break;
 
     case 2:
-        //p = remove_stream(p);
+        p = remove_stream(p);
         output(0).push(p);
         break;
     case 3:
@@ -78,7 +78,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         break;
     // remove stream
      case 4:
-       // p = update_ack(p);
+        p = update_ack(p);
         output(2).push(p);
         break;
 
@@ -118,13 +118,14 @@ Packet* StreamManager::add_stream(Packet* p)
 
     IPFlowID id(p, false);
 
-    stream_data::cb_data cb;
+    /*stream_data::cb_data cb;
     cb.ptr = NULL;
     cb.el = this;
+*/
 
     // assign the stream to the hashtable
     tbl_lock.acquire();
-    hash.set(id, stream_data(p, tcph->th_seq, tcph->th_ack, &cb));
+    hash.set(id, stream_data(p, tcph->th_seq, tcph->th_ack, this));
     tbl_lock.release();
 
     return p;
@@ -192,7 +193,12 @@ Packet* StreamManager::update_ack(Packet* p)
     // extract flow id
     // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport,
     // iph->ip_dst.s_addr,tcph->th_dport);
-
+/*
+    WritablePacket* zwa = p->clone()->uniqueify();
+    click_tcp* th = zwa->tcp_header();
+    th->th_win = 0;
+    output(1).push(zwa);
+*/
     IPFlowID id(p, false);
 
     // lock the hash??
@@ -201,26 +207,45 @@ Packet* StreamManager::update_ack(Packet* p)
     HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.find(id.reverse());
     if(it != hash.end())
     {
+//        printf("ACK: %ld\t SEQ: %ld\n", ntohl(tcph->th_ack), ntohl(tcph->th_seq));
         //update the sequence number
-        if (it->second.seq > tcph->th_seq)
+        if (ntohl(it->second.seq) < ntohl(tcph->th_seq))
+        {
             it->second.seq = tcph->th_seq;
+        }
 
         // update the ack number
-        if (it->second.ack > tcph->th_ack)
+        if (ntohl(it->second.ack) < ntohl(tcph->th_ack))
+        {
             it->second.ack = tcph->th_ack;
+        }
 
         // if the persist timer has expired, we've already sent
         // 0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2
         // here?)
         if (it->second.frozen)
         {
-            output(2).push(p->clone());
-            output(2).push(p->clone());
+            output(1).push(p->clone());
+            output(1).push(p->clone());
            // output(2).push(p->clone());
             it->second.frozen = false;
         }
 
-        it->second.reset_timers();
+        WritablePacket* zwa = p->clone()->uniqueify();
+        click_tcp* th = zwa->tcp_header();
+        th->th_win = 0;
+//        output(1).push(zwa);
+
+        it->second.p->kill();
+        it->second.p = zwa;
+
+//        it->second.send_zero_wnd();
+//        it->second.reset_timers();
+//
+        if(tcph->th_flags & (TH_RST | TH_FIN))
+        {
+            remove_stream(p);
+        }
 
     }
     // unlock the hash??
