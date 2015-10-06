@@ -209,7 +209,7 @@ Packet* StreamManager::update_ack(Packet* p)
     {
 //        printf("ACK: %ld\t SEQ: %ld\n", ntohl(tcph->th_ack), ntohl(tcph->th_seq));
         //update the sequence number
-        if (ntohl(it->second.seq) < ntohl(tcph->th_seq))
+/*        if (ntohl(it->second.seq) < ntohl(tcph->th_seq))
         {
             it->second.seq = tcph->th_seq;
         }
@@ -219,34 +219,37 @@ Packet* StreamManager::update_ack(Packet* p)
         {
             it->second.ack = tcph->th_ack;
         }
-
+*/
         // if the persist timer has expired, we've already sent
         // 0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2
         // here?)
+
         if (it->second.frozen)
         {
-            output(1).push(p->clone());
-            output(1).push(p->clone());
-           // output(2).push(p->clone());
+           // output(1).push(p->clone());
+            //output(1).push(p->clone());
+            // output(2).push(p->clone());
             it->second.frozen = false;
         }
 
-        WritablePacket* zwa = p->clone()->uniqueify();
-        click_tcp* th = zwa->tcp_header();
-        th->th_win = 0;
-//        output(1).push(zwa);
-
-        it->second.p->kill();
-        it->second.p = zwa;
 
 //        it->second.send_zero_wnd();
-//        it->second.reset_timers();
-//
+        it->second.reset_timers();
+
         if(tcph->th_flags & (TH_RST | TH_FIN))
         {
-            remove_stream(p);
+            remove_stream(p);     //remove the stream if we see FIN or RST
         }
+        else
+        {
+            WritablePacket* zwa = p->clone()->uniqueify();
+            click_tcp* th = zwa->tcp_header();
+            th->th_win = 0;
+//        output(1).push(zwa);
 
+            it->second.p->kill();
+            it->second.p = zwa;
+        }
     }
     // unlock the hash??
     tbl_lock.release();
