@@ -28,7 +28,7 @@ class stream_data
 
     // default constructor
     stream_data()
-        : p(0), seq(0), ack(0), persist_timer(4800), val(1500), frozen(false)
+        : p(0), seq(0), ack(0), persist_timer(200), val(1500), frozen(false)
     {
         cb_ptrs.ptr=this;
         //zero_wnd.assign(send_zero_wnd, this);
@@ -48,7 +48,7 @@ class stream_data
     }
 */
     stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in, Element* el)
-        : p(0), seq(seq_in), ack(ack_in), persist_timer(4800),
+        : p(0), seq(seq_in), ack(ack_in), persist_timer(200),
           val(1500), zero_wnd(callback, &cb_ptrs), frozen(false)
     {
         cb_ptrs.el = el;
@@ -232,7 +232,7 @@ class stream_data
             // persist_timer = (uint32_t)floor(val);
             persist_timer = (uint32_t)val;
         }
-        return persist_timer - 200; // remove 200 ms from timer to beat
+        return persist_timer; // remove 200 ms from timer to beat
     }
 
     /**
@@ -243,8 +243,9 @@ class stream_data
     void reset_timers()
     {
         frozen = false;
-        persist_timer = 4800;
+        persist_timer = 200;
         val = 1500;
+        zero_wnd.schedule_after_ms(persist_timer);
     }
 
     // Timer keepalive;

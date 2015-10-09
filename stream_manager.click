@@ -18,7 +18,7 @@ out0 :: Queue
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
     -> ToDevice(eth0)
     -> Discard ;
-out1 :: Queue
+out1 :: Queue(50000)
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
 //    -> ToDevice(eth1)
     -> Discard ;
@@ -68,10 +68,10 @@ cl[3]->[1]stream;  // update stream
 cl[4]->[3]stream;  // do nothing, pass packets along
 
 
-fr0 :: IPFragmenter(1500) ;
+fr0 :: IPFragmenter(1518) ;
 fr0[1] -> ICMPError(1.1.1.1, unreachable, needfrag) -> Discard ;
 
-fr1 :: IPFragmenter(1500) ;
+fr1 :: IPFragmenter(1518) ;
 fr1[1] -> ICMPError(2.2.2.1, unreachable, needfrag) -> Discard ;
 
 
