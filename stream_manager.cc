@@ -65,7 +65,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
 
     // update timers
     case 1:
-        //p = update_stream(p);
+        p = update_stream(p);
         output(0).push(p);
         break;
 
@@ -73,19 +73,50 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         p = remove_stream(p);
         output(0).push(p);
         break;
+
     case 3:
         output(0).push(p);
         break;
+
     // remove stream
-     case 4:
+    case 4:
         p = update_ack(p);
         output(2).push(p);
         break;
+
+    case 5:
+        p = hp_streams(p);
+        output(0).push(p);
 
     // not one of our ports, so do nothing, and pass the packet on.
     default:
         break;
     };
+
+    return p;
+}
+
+
+Packet* StreamManager::hp_streams(Packet* p)
+{
+    const click_tcp* tcph = p->tcp_header();
+    if(tcph->th_syn)
+    {
+        IPFlowID id(p, false);
+        // assign the stream to the hashtable
+        hp_lock.acquire();
+        hp.set(id, 1);
+        hp_lock.release();
+    }
+    else if((tcph->th_flags & TH_FIN) || (tcph->th_flags & TH_RST) )
+    {
+         IPFlowID id(p, false);
+        // assign the stream to the hashtable
+        hp_lock.acquire();
+        if (hp.erase(id) == 0)
+            hp.erase(id.reverse());
+        hp_lock.release();
+    }
 
     return p;
 }
@@ -177,9 +208,9 @@ Packet* StreamManager::update_stream(Packet* p)
     tbl_lock.acquire();
 
     HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.find(id);
-    if (it != hash.end())
+    if (it != hash.end() && it->second.frozen)
     {
-        it->second.reset_timers();
+        it->second.send_zero_wnd();
     }
     tbl_lock.release();
 
@@ -226,9 +257,9 @@ Packet* StreamManager::update_ack(Packet* p)
 
         if (it->second.frozen)
         {
-           // output(1).push(p->clone());
             //output(1).push(p->clone());
-            // output(2).push(p->clone());
+            //output(1).push(p->clone());
+            //output(2).push(p->clone());
             it->second.frozen = false;
         }
 
@@ -245,6 +276,8 @@ Packet* StreamManager::update_ack(Packet* p)
             WritablePacket* zwa = p->clone()->uniqueify();
             click_tcp* th = zwa->tcp_header();
             th->th_win = 0;
+//            uint32_t old_ack = ntohl(th->th_ack);
+//            th->th_ack = htonl(old_ack );
 //        output(1).push(zwa);
 
             it->second.p->kill();

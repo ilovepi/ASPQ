@@ -28,7 +28,7 @@ class stream_data
 
     // default constructor
     stream_data()
-        : p(0), seq(0), ack(0), persist_timer(200), val(1500), frozen(false)
+        : p(0), seq(0), ack(0), persist_timer(1000), val(1500), frozen(false)
     {
         cb_ptrs.ptr=this;
         //zero_wnd.assign(send_zero_wnd, this);
@@ -48,7 +48,7 @@ class stream_data
     }
 */
     stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in, Element* el)
-        : p(0), seq(seq_in), ack(ack_in), persist_timer(200),
+        : p(0), seq(seq_in), ack(ack_in), persist_timer(1000),
           val(1500), zero_wnd(callback, &cb_ptrs), frozen(false)
     {
         cb_ptrs.el = el;
@@ -129,7 +129,7 @@ class stream_data
 
         // output 1 goes to a tcp checksum element followed by ipcsum
         // element before normal routing
-        el->output(1).push(p->clone()); // maybe wrong!!!!!!!!
+        //el->output(1).push(p->clone()); // maybe wrong!!!!!!!!
 
         timer->reschedule_after_ms(update_persist_timer());
     }
@@ -143,7 +143,9 @@ class stream_data
 //        printf("My ack: %ld\tMy seq: %ld\tACK: %ld\t SEQ: %ld\n",  ntohl(ack), ntohl(seq), ntohl(tcp->th_ack), ntohl(tcp->th_seq));
         // output 1 goes to a tcp checksum element followed by ipcsum
         // element before normal routing
-        cb_ptrs.el->output(1).push(p->clone()->uniqueify()); // maybe wrong!!!!!!!!
+
+        //for(int i = 0; i < 3; ++i)
+            cb_ptrs.el->output(1).push(p->clone()->uniqueify()); // maybe wrong!!!!!!!!
 
         zero_wnd.reschedule_after_ms(update_persist_timer());
     }
@@ -218,7 +220,7 @@ class stream_data
         // we limit the persist_timer to 5,5,6,12,24,48,60,60,60...
         if (val < 60000)
             val = val * 2;
-
+/*
         if (val < 5000)
         {
             persist_timer = 5000;
@@ -232,6 +234,11 @@ class stream_data
             // persist_timer = (uint32_t)floor(val);
             persist_timer = (uint32_t)val;
         }
+        */
+        if(val >= 60000)
+            persist_timer = 60000;
+        else
+            persist_timer = (uint32_t)val;
         return persist_timer; // remove 200 ms from timer to beat
     }
 
@@ -245,7 +252,7 @@ class stream_data
         frozen = false;
         persist_timer = 200;
         val = 1500;
-        zero_wnd.schedule_after_ms(persist_timer);
+//        zero_wnd.schedule_after_ms(persist_timer);
     }
 
     // Timer keepalive;

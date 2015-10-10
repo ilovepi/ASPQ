@@ -42,13 +42,13 @@ c1[0] -> ar0 -> out1;
 c0[0] -> ar1 -> out0;
 
 
-
 c0[1] ->[1]arpq0 ;
 c1[1] ->[1]arpq1 ;
 
 stream :: StreamManager;
 stream[0] -> Discard ;
-stream[1] -> SetTCPChecksum -> SetIPChecksum
+stream[1] -> SetTCPChecksum 
+            -> SetIPChecksum
 //            -> IPPrint(TIMESTAMP false, LENGTH true)
             -> arpq0 ;
 stream[2] -> Discard ;
@@ -67,18 +67,18 @@ cl[2]->[2]stream;  // remove stream
 cl[3]->[1]stream;  // update stream
 cl[4]->[3]stream;  // do nothing, pass packets along
 
-
+/*
 fr0 :: IPFragmenter(1518) ;
-fr0[1] -> ICMPError(1.1.1.1, unreachable, needfrag) -> Discard ;
-
+fr0[1] -> ICMPError(1.1.1.1, unreachable, needfrag) -> arpq0 ;
+*/
 fr1 :: IPFragmenter(1518) ;
-fr1[1] -> ICMPError(2.2.2.1, unreachable, needfrag) -> Discard ;
+fr1[1] -> ICMPError(2.2.2.1, unreachable, needfrag) -> arpq1 ;
 
 
 ip0 :: Strip(14)
-    -> MarkIPHeader
-    -> fr0
-    -> CheckIPHeader2(VERBOSE true)
+    -> MarkIPHeader -> GetIPAddress(16)
+//    -> fr0
+//    -> CheckIPHeader2(VERBOSE true)
 //    -> IPPrint(TIMESTAMP false,  CONTENTS NONE)
     ->  cl ;
 

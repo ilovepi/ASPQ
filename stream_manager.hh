@@ -53,12 +53,16 @@ class StreamManager : public Element
     Packet* remove_stream(Packet* p);
     Packet* update_stream(Packet* p);
     Packet* update_ack(Packet* p);
+    Packet* hp_streams(Packet* p);
+
 
   private:
     ErrorHandler* _errh;
     HashTable<IPFlowID, stream_data> hash;
+    HashTable<FlowID, int> hp_hash;
     SimpleSpinlock tbl_lock;
-
+    SimpleSpinlock hp_lock;
+    bool frozen;
 };
 
 CLICK_ENDDECLS
