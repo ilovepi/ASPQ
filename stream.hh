@@ -28,7 +28,7 @@ class stream_data
 
     // default constructor
     stream_data()
-        : p(0), seq(0), ack(0), persist_timer(1000), val(1500), frozen(false)
+        : p(0), seq(0), ack(0), persist_timer(200), val(1500), frozen(false),update_zwa(true)
     {
         cb_ptrs.ptr=this;
         //zero_wnd.assign(send_zero_wnd, this);
@@ -48,8 +48,8 @@ class stream_data
     }
 */
     stream_data(const Packet* p_in, tcp_seq_t seq_in, tcp_seq_t ack_in, Element* el)
-        : p(0), seq(seq_in), ack(ack_in), persist_timer(1000),
-          val(1500), zero_wnd(callback, &cb_ptrs), frozen(false)
+        : p(0), seq(seq_in), ack(ack_in), persist_timer(200),
+          val(1500), zero_wnd(callback, &cb_ptrs), frozen(false),update_zwa(true)
     {
         cb_ptrs.el = el;
         cb_ptrs.ptr = this;
@@ -64,7 +64,7 @@ class stream_data
     stream_data(const stream_data& other)
         : cb_ptrs(other.cb_ptrs), seq(other.seq), ack(other.ack),
           persist_timer(other.persist_timer), val(other.val),
-          zero_wnd(callback, &cb_ptrs), frozen(false)
+          zero_wnd(callback, &cb_ptrs), frozen(other.frozen),update_zwa(other.update_zwa)
     {
         cb_ptrs.ptr=this;
         p = other.p->clone()->uniqueify();
@@ -94,6 +94,7 @@ class stream_data
             zero_wnd.assign(callback, &cb_ptrs);
             zero_wnd.schedule_at(other.zero_wnd.expiry());
             frozen = other.frozen;
+            update_zwa = other.update_zwa;
         }
 
         return *this;
@@ -148,6 +149,18 @@ class stream_data
             cb_ptrs.el->output(1).push(p->clone()->uniqueify()); // maybe wrong!!!!!!!!
 
         zero_wnd.reschedule_after_ms(update_persist_timer());
+    }
+
+    void send_zero_wnd(Packet* p_in)
+    {
+        update_zwa = false;
+        const click_tcp* tcph = p_in->tcp_header();
+        click_tcp* zwah = p->tcp_header();
+
+        zwah->th_ack =  htonl(ntohl(tcph->th_seq)+1);
+        cb_ptrs.el->output(1).push(p->clone()->uniqueify());
+        zero_wnd.reschedule_after_ms(update_persist_timer());
+
     }
 
     /**
@@ -252,8 +265,21 @@ class stream_data
         frozen = false;
         persist_timer = 200;
         val = 1500;
-//        zero_wnd.schedule_after_ms(persist_timer);
+        update_zwa = true;
+        zero_wnd.schedule_after_ms(persist_timer);
     }
+
+    void unfreeze()
+    {
+        reset_timers();
+        WritablePacket thaw = p->clone()->uniqueify();
+        const click_tcp* tcph = thaw->tcp_header();
+        tcph->window = last_window;
+        for(int i = 0; i < 3; ++i)
+            cb_ptrs.el->output(1).push(thaw);
+    }
+
+
 
     // Timer keepalive;
     cb_data cb_ptrs;
@@ -264,6 +290,8 @@ class stream_data
     float val;
     Timer zero_wnd;
     bool frozen;
+    bool update_zwa;
+    uint32_t last_window;
 
 }; // end class stream
 

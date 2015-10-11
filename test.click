@@ -9,17 +9,17 @@ c1 :: Classifier(12/0806 20/0001,
                   12/0800,
                   -);
 
-FromDevice(eth0, PROMISC true, SNIFFER false) -> c0 ;
+FromDevice(eth0, PROMISC true) -> c0 ;
 
-FromDevice(eth1, PROMISC true, SNIFFER false) -> c1 ;
+FromDevice(eth1, PROMISC true) -> c1 ;
 
-out0 :: ThreadSafeQueue(5000)
+out0 :: Queue(10000)
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
     -> ToDevice(eth0)
     -> Discard ;
-out1 :: ThreadSafeQueue(5000)
+out1 :: Queue(10000)
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
-//    -> ToDevice(eth1)
+    -> ToDevice(eth1)
     -> Discard ;
 
 arpq0 :: ARPQuerier(169.254.9.88, 94:57:A5:8E:12:F4) -> out0 ;
@@ -50,16 +50,16 @@ t1[1] ->[1]arpq1
 c0[1] -> t0;
 c1[1] -> t1 ;
 
-fr0 :: IPFragmenter(1500) ;
+fr0 :: IPFragmenter(1500, HONOR_DF false) ;
 fr0[1] -> ICMPError(169.254.9.88, unreachable, needfrag) -> arpq0 ;
 
-fr1 :: IPFragmenter(1500) ;
+fr1 :: IPFragmenter(1500, HONOR_DF false) ;
 fr1[1] -> ICMPError(169.254.9.93, unreachable, needfrag) -> arpq1 ;
 
-ip0 :: Strip(14) 
+ip0 :: Strip(14)
     -> MarkIPHeader
     -> fr0
-    -> IPPrint(TIMESTAMP false, LENGTH true)
+//    -> IPPrint(TIMESTAMP false, LENGTH true)
     -> CheckIPHeader(OFFSET 0, VERBOSE true)
     -> arpq1 ;
 
@@ -67,7 +67,7 @@ c0[2]-> ip0;
 
 
 ip1 :: Strip(14)
-     -> MarkIPHeader
+    -> MarkIPHeader
     -> fr1
     -> CheckIPHeader2(OFFSET 0, VERBOSE true)
 //    -> IPPrint(TIMESTAMP false, LENGTH true)

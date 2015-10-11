@@ -39,7 +39,7 @@ class StreamManager : public Element
     ~StreamManager();
 
     const char* class_name() const { return "StreamManager"; }
-    const char* port_count() const { return "5/3"; }
+    const char* port_count() const { return "7/3"; }
     const char* processing() const { return "h/h"; }
 
     int initialize(ErrorHandler* errh);
@@ -53,13 +53,14 @@ class StreamManager : public Element
     Packet* remove_stream(Packet* p);
     Packet* update_stream(Packet* p);
     Packet* update_ack(Packet* p);
-    Packet* hp_streams(Packet* p);
-
+    Packet* hp_add(Packet* p);
+    Packet* hp_remove(Packet* p);
+    void unfreeze();
 
   private:
     ErrorHandler* _errh;
     HashTable<IPFlowID, stream_data> hash;
-    HashTable<FlowID, int> hp_hash;
+    HashTable<IPFlowID, int> hp_hash;
     SimpleSpinlock tbl_lock;
     SimpleSpinlock hp_lock;
     bool frozen;

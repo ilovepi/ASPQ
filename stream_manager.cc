@@ -3,7 +3,7 @@
 
 CLICK_DECLS
 
-StreamManager::StreamManager() {}
+StreamManager::StreamManager():frozen(false) {}
 StreamManager::~StreamManager() {}
 
 int StreamManager::initialize(ErrorHandler* errh) { return 0; }
@@ -63,7 +63,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         output(0).push(p);
         break;
 
-    // update timers
+    // reply to ZWPs or any other packets if we're FROZEN
     case 1:
         p = update_stream(p);
         output(0).push(p);
@@ -75,7 +75,7 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         break;
 
     case 3:
-        output(0).push(p);
+        output(1).push(p);
         break;
 
     // remove stream
@@ -85,7 +85,11 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
         break;
 
     case 5:
-        p = hp_streams(p);
+        p = hp_add(p);
+        output(0).push(p);
+
+    case 6:
+        p = hp_remove(p);
         output(0).push(p);
 
     // not one of our ports, so do nothing, and pass the packet on.
@@ -97,29 +101,37 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
 }
 
 
-Packet* StreamManager::hp_streams(Packet* p)
+Packet* StreamManager::hp_add(Packet* p)
 {
-    const click_tcp* tcph = p->tcp_header();
-    if(tcph->th_syn)
-    {
-        IPFlowID id(p, false);
-        // assign the stream to the hashtable
-        hp_lock.acquire();
-        hp.set(id, 1);
-        hp_lock.release();
-    }
-    else if((tcph->th_flags & TH_FIN) || (tcph->th_flags & TH_RST) )
-    {
-         IPFlowID id(p, false);
-        // assign the stream to the hashtable
-        hp_lock.acquire();
-        if (hp.erase(id) == 0)
-            hp.erase(id.reverse());
-        hp_lock.release();
-    }
+    IPFlowID id(p, false);
+
+    // assign the stream to the hashtable
+    hp_lock.acquire();
+    hp_hash.set(id, 1);
+    frozen = true;
+    hp_lock.release();
 
     return p;
 }
+
+Packet* StreamManager::hp_remove(Packet* p)
+{
+    IPFlowID id(p, false);
+
+    // move the stream from the hashtable
+    hp_lock.acquire();
+    if (hp_hash.erase(id) == 0)
+        hp_hash.erase(id.reverse());
+    if(hp_hash.empty())
+        frozen = false;
+//    tbl_lock.acquire();
+
+  //  tbl_lock.release();
+    hp_lock.release();
+
+    return p;
+}
+
 
 /**
  * @brief adds a stream to the table, with timers
@@ -131,14 +143,6 @@ Packet* StreamManager::hp_streams(Packet* p)
  */
 Packet* StreamManager::add_stream(Packet* p)
 {
-/*  const click_ip* iph = p->ip_header();
-    if (iph->ip_len < 40 || iph->ip_p != IPPROTO_TCP)
-    {
-        //   DEBUG_CHATTER("Non TCP");
-        // ignore non-TCP traffic
-        return p;
-    }
-*/
     const click_tcp* tcph = p->tcp_header();
     // int header_len = (iph->ip_hl << 2) + (tcph->th_off << 2);
     // int datalen = p->length() - header_len;
@@ -165,13 +169,6 @@ Packet* StreamManager::add_stream(Packet* p)
 Packet* StreamManager::remove_stream(Packet* p)
 {
     const click_ip* iph = p->ip_header();
-/*    if (p->length() < 40 || iph->ip_p != IPPROTO_TCP)
-    {
-        // DEBUG_CHATTER("Non TCP");
-        // ignore non-TCP traffic
-        return p;
-    }
-*/
     const click_tcp* tcph = p->tcp_header();
 
     // extract flow id
@@ -188,29 +185,18 @@ Packet* StreamManager::remove_stream(Packet* p)
 
 Packet* StreamManager::update_stream(Packet* p)
 {
-/*    const click_ip* iph = p->ip_header();
-    if (p->length() < 40 || iph->ip_p != IPPROTO_TCP)
-    {
-        // DEBUG_CHATTER("Non TCP");
-        // ignore non-TCP traffic
-        return p;
-    }
-
-    const click_tcp* tcph = p->tcp_header();
-*/
-    // extract flow id
-    // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport,
-    // iph->ip_dst.s_addr,tcph->th_dport);
-
     IPFlowID id(p, false);
 
-    // lock the hash??
+    // lock the hash
     tbl_lock.acquire();
 
     HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.find(id);
-    if (it != hash.end() && it->second.frozen)
+    if (it != hash.end() && it->second.frozen && frozen)
     {
-        it->second.send_zero_wnd();
+        if(it->second.update_zwa)
+            it->second.send_zero_wnd(p);
+        else
+            it->second.send_zero_wnd();
     }
     tbl_lock.release();
 
@@ -221,15 +207,6 @@ Packet* StreamManager::update_ack(Packet* p)
 {
     const click_tcp* tcph = p->tcp_header();
 
-    // extract flow id
-    // IPFlowID id(iph->ip_src.s_addr, tcph->th_sport,
-    // iph->ip_dst.s_addr,tcph->th_dport);
-/*
-    WritablePacket* zwa = p->clone()->uniqueify();
-    click_tcp* th = zwa->tcp_header();
-    th->th_win = 0;
-    output(1).push(zwa);
-*/
     IPFlowID id(p, false);
 
     // lock the hash??
@@ -255,13 +232,15 @@ Packet* StreamManager::update_ack(Packet* p)
         // 0 WND notification. Unfreeze TCP with tri-ACK(maybe only send 2
         // here?)
 
-        if (it->second.frozen)
+/*        if (it->second.frozen)
+        if(frozen)
         {
             //output(1).push(p->clone());
             //output(1).push(p->clone());
             //output(2).push(p->clone());
             it->second.frozen = false;
         }
+*/
 
 
 //        it->second.send_zero_wnd();
@@ -270,18 +249,20 @@ Packet* StreamManager::update_ack(Packet* p)
         if(tcph->th_flags & (TH_RST | TH_FIN))
         {
             remove_stream(p);     //remove the stream if we see FIN or RST
+            return p;
         }
         else
         {
             WritablePacket* zwa = p->clone()->uniqueify();
             click_tcp* th = zwa->tcp_header();
             th->th_win = 0;
-//            uint32_t old_ack = ntohl(th->th_ack);
-//            th->th_ack = htonl(old_ack );
-//        output(1).push(zwa);
+            it->second.last_window = th->window;
 
             it->second.p->kill();
             it->second.p = zwa;
+            table.release();
+            p->kill();
+            return zwa->clone();
         }
     }
     // unlock the hash??
@@ -290,6 +271,15 @@ Packet* StreamManager::update_ack(Packet* p)
 }
 
 
+void StreamManager::unfreeze()
+{
+    tbl_lock.acquire();
+    for(HashTable_iterator<Pair<const IPFlowID, stream_data> > it = hash.begin(); it != hash.end(); ++it)
+    {
+        it->second.unfreeze();
+    }
+    tbl_lock.release();
+}
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StreamManager)
