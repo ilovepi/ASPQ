@@ -20,20 +20,20 @@ out0 :: Queue
     -> Discard ;
 out1 :: Queue(50000)
 //    -> ARPPrint(TIMESTAMP false, ETHER true)
-    -> ToDevice(eth1)
+//    -> ToDevice(eth1)
     -> Discard ;
-
+/*
 arpq0 :: ARPQuerier(169.254.9.88, 94:57:A5:8E:12:F4) -> out0 ;
 arpq1 :: ARPQuerier(169.254.9.93, 94:57:A5:8E:12:F5) -> out1 ;
-ar0 :: ARPResponder(169.254.9.88/16 94:57:A5:8E:12:F4) ;
-ar1 :: ARPResponder(169.254.9.93/16 94:57:A5:8E:12:F5) ;
+ar0 :: ARPResponder(169.254.8.21/32 94:57:A5:8E:12:F4) ;
+ar1 :: ARPResponder(169.254.8.236/32 94:57:A5:8E:12:F5) ;
+*/
 
-/*
 arpq0 :: ARPQuerier(1.1.1.1, 94:57:A5:8E:12:F4) -> out0 ;
 arpq1 :: ARPQuerier(2.2.2.1, 94:57:A5:8E:12:F5) -> out1 ;
 ar0 :: ARPResponder(1.1.1.1/24 94:57:A5:8E:12:F4) ;
 ar1 :: ARPResponder(2.2.2.1/24 94:57:A5:8E:12:F5) ;
-*/
+
 c1[0] -> ar0 -> out1;
 c0[0] -> ar1 -> out0;
 

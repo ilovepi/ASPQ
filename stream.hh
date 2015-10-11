@@ -121,7 +121,7 @@ class stream_data
 
     void send_zero_wnd(Timer* timer, void* data)
     {
-        Element* el = (Element*)data;
+        //Element* el = (Element*)data;
 /*        click_tcp* tcp = p->tcp_header();
         tcp->th_ack = ack;
         tcp->th_seq = seq;
@@ -272,9 +272,9 @@ class stream_data
     void unfreeze()
     {
         reset_timers();
-        WritablePacket thaw = p->clone()->uniqueify();
-        const click_tcp* tcph = thaw->tcp_header();
-        tcph->window = last_window;
+        WritablePacket* thaw = p->clone()->uniqueify();
+        click_tcp* tcph = thaw->tcp_header();
+        tcph->th_win = last_window;
         for(int i = 0; i < 3; ++i)
             cb_ptrs.el->output(1).push(thaw);
     }

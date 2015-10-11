@@ -59,18 +59,18 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
     {
     // add stream
     case 0:
-        p = add_stream(p);
+       // p = add_stream(p);
         output(0).push(p);
         break;
 
     // reply to ZWPs or any other packets if we're FROZEN
     case 1:
-        p = update_stream(p);
+        //p = update_stream(p);
         output(0).push(p);
         break;
 
     case 2:
-        p = remove_stream(p);
+        //p = remove_stream(p);
         output(0).push(p);
         break;
 
@@ -80,17 +80,19 @@ Packet* StreamManager::handle_packet(int port, Packet* p)
 
     // remove stream
     case 4:
-        p = update_ack(p);
+       // p = update_ack(p);
         output(2).push(p);
         break;
 
     case 5:
-        p = hp_add(p);
+        //p = hp_add(p);
         output(0).push(p);
+        break;
 
     case 6:
-        p = hp_remove(p);
+        //p = hp_remove(p);
         output(0).push(p);
+        break;
 
     // not one of our ports, so do nothing, and pass the packet on.
     default:
@@ -256,11 +258,11 @@ Packet* StreamManager::update_ack(Packet* p)
             WritablePacket* zwa = p->clone()->uniqueify();
             click_tcp* th = zwa->tcp_header();
             th->th_win = 0;
-            it->second.last_window = th->window;
+            it->second.last_window = th->th_win;
 
             it->second.p->kill();
             it->second.p = zwa;
-            table.release();
+            tbl_lock.release();
             p->kill();
             return zwa->clone();
         }
