@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <sys/prctl.h>
 #include <signal.h>
+#include <unistd.h>
 
 int receiver(int port)
 {
@@ -59,5 +60,3 @@ int main()
     }
 
 }
-
-
