@@ -37,6 +37,7 @@ int send_data(const char* ipaddr, int port, int size)
         if(n < 0)
         {
             perror("Error sending data");
+            exit(-1);
         }
     }
     printf("Done %s\n", ipaddr);
