@@ -1,6 +1,3 @@
-
-CC=clang
-
 all: client server
 
 client: client.c
